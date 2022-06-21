@@ -1,0 +1,103 @@
+select * from dbo.Nashville
+
+--- Standardized date format
+
+alter table Nashville
+drop column SaleDate2
+
+update Nashville
+set SaleDate3 = CONVERT(Date, Saledate)
+
+
+-- Populate property address
+
+
+select * from dbo.Nashville order by ParcelID
+
+select a.PropertyAddress, a.ParcelID, b.PropertyAddress, b.ParcelID, ISNULL(a.PropertyAddress, b.PropertyAddress) as new_address
+from dbo.Nashville a 
+join dbo.Nashville b 
+on a.ParcelID = b.ParcelID
+and a.[UniqueID ] != b.[UniqueID ]
+
+
+update a 
+set PropertyAddress = ISNULL(a.PropertyAddress, b.PropertyAddress)
+from dbo.Nashville a join dbo.Nashville b on a.ParcelID = b.ParcelID
+and a.[UniqueID ] != b.[UniqueID ]
+where a.PropertyAddress is null
+
+
+select SUBSTRING(PropertyAddress, 1, Charindex(',', PropertyAddress) -1) as address from dbo.Nashville
+select SUBSTRING(PropertyAddress,Charindex(',', PropertyAddress) +1 ,LEN(PropertyAddress)) as address from dbo.Nashville
+
+
+alter table dbo.Nashville 
+add PropertySplitAddress NVARCHAR(255)
+
+update dbo.Nashville
+set PropertyAddress = SUBSTRING(PropertyAddress, 1, Charindex(',', PropertyAddress) -1)
+
+alter table dbo.Nashville 
+add PropertySplitCity NVARCHAR(255)
+
+update dbo.Nashville
+set PropertyAddress = SUBSTRING(PropertyAddress,Charindex(',', PropertyAddress) +1 ,LEN(PropertyAddress)
+
+select PARSENAME(replace(OwnerAddress, ',', '.'), 3),
+PARSENAME(replace(OwnerAddress, ',', '.'), 2),
+PARSENAME(replace(OwnerAddress, ',', '.'), 1)
+from dbo.Nashville
+
+alter table dbo.Nashville 
+add OwnerSplitAddress NVARCHAR(255)
+
+update dbo.Nashville
+set OwnerSplitAddress = PARSENAME(replace(OwnerAddress, ',', '.'), 3)
+
+alter table dbo.Nashville 
+add OwnerSplitCity NVARCHAR(255)
+
+update dbo.Nashville
+set OwnerSplitCity = PARSENAME(replace(OwnerAddress, ',', '.'), 2)
+
+alter table dbo.Nashville 
+add OwnerSplitState NVARCHAR(255)
+
+update dbo.Nashville
+set OwnerSplitState = PARSENAME(replace(OwnerAddress, ',', '.'), 1)
+
+
+-- Change Y n N to Yes and No in SoldAsVacant 
+
+select 
+CASE when SoldAsVacant = 'Y' then 'Yes'
+when SoldAsVacant = 'N' then 'No'
+else SoldAsVacant
+end
+from dbo.Nashville
+
+update dbo.Nashville
+set SoldAsVacant = CASE when SoldAsVacant = 'Y' then 'Yes'
+when SoldAsVacant = 'N' then 'No'
+else SoldAsVacant
+end
+
+select distinct SoldAsVacant, COUNT(SoldAsVacant) from dbo.Nashville
+group by SoldAsVacant order by 2
+
+--Delete duplicates from the table
+
+with rownumcte as
+(
+select *, row_number() over(partition by ParcelID, SaleDate, SalePrice order by ParcelID) as rn from dbo.Nashville
+)
+select * from rownumcte where rn >1 
+
+
+-- Delete unused columns
+
+alter table dbo.Nashville
+drop column PropertyAddress, SaleDate, OwnerAddress
+
+select * from dbo.Nashville
